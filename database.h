@@ -28,13 +28,14 @@ class Database
     void AddTitleToDict(ArticleIt it, const QString & title)
     {
         it->title = title;
-        _dictionary.insert(title, &it.value());
+        if (!_dictionary.contains(title))
+            _dictionary.insert(title, &it.value());
     }
 
     void AddLink(ArticleIt it, const QString & title)
     {
         auto linkIt = _dictionary.find(title);
-        if (linkIt != _dictionary.end())
+        if (linkIt != _dictionary.end() && !it->links.contains(linkIt.value()))
             it->links.append(linkIt.value());
     }
 
@@ -64,27 +65,32 @@ class Database
                 uint32_t id = 0;
                 pageStream >> id;
 
+               pageStream >> ch; //skip ','
+
+                int nspace = 0;
+                pageStream >> nspace;
+
                 auto it = getIterator(id);
 
-                if (it == _articles.end())
-                    continue;
-
-                while (ch != '\'') // search beginning of the title
+                if (nspace == 0 && it != _articles.end())
                 {
-                    pageStream >> ch;
+                    while (ch != '\'') // search beginning of the title
+                    {
+                        pageStream >> ch;
+                    }
+
+
+                    QString title;
+
+                    pageStream >> ch; //*reading the first symbol of the title
+                    do
+                    {
+                        title.append(ch);
+                        pageStream >> ch;
+                    } while (ch != '\'');
+
+                    processIterator(it, title);
                 }
-
-
-                QString title;
-
-                pageStream >> ch; //*reading the first symbol of the title
-                do
-                {
-                    title.append(ch);
-                    pageStream >> ch;
-                } while (ch != '\'');
-
-                processIterator(it, title);
 
                 while (ch != ')') //skipping extra data
                 {
@@ -159,7 +165,7 @@ public:
 
         ProcessSqlFile("./../wikidb/ruwiki-latest-page.sql", std::bind(&Database::InsertNewArticle, this, _1), std::bind(&Database::AddTitleToDict, this, _1, _2));
         ProcessSqlFile("./../wikidb/ruwiki-latest-pagelinks.sql", std::bind(&Database::FindArticleById, this, _1), std::bind(&Database::AddLink, this, _1, _2));
-        //ExtractAbstracts("./../wikidb/ruwiki-latest-pages-articles1.xml");
+        ExtractAbstracts("./../wikidb/ruwiki-latest-pages-articles1.xml");
     }
 };
 
