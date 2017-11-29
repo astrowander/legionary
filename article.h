@@ -2,6 +2,7 @@
 #define ARTICLE_H
 
 #include "includes.h"
+#include "tinyint.h"
 
 #include <QHash>
 #include <QList>
@@ -10,10 +11,10 @@
 struct Article
 {
     QString title;
-    QList<Article*> links;
+    QList<TinyInt> links;
 };
 
-typedef QHash<uint32_t, Article>::iterator ArticleIt;
+typedef QHash<TinyInt, Article>::iterator ArticleIt;
 
 #endif // ARTICLE_H
 

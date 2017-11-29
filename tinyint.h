@@ -17,20 +17,25 @@ public:
         data[2] = val & 0xFF;
     }
 
-    bool operator==(TinyInt other)
+    bool operator==(TinyInt other) const
     {
         return (data[0] == other.data[0]) && (data[1] == other.data[1]) && (data[2] == other.data[2]);
     }
 
-    bool operator!=(TinyInt other)
+    bool operator!=(TinyInt other) const
     {
         return (*this == other);
     }
 
-    /*uint32_t ToUint()
+    uint ToUint() const
     {
-        return (data[0] << 16) | (data[1] << 8) | data
-    }*/
+        return (data[0] << 16) | (data[1] << 8) | data[2];
+    }
 };
+
+inline uint qHash(const TinyInt & val)
+{
+    return qHash(val.ToUint());
+}
 
 #endif // TINYINT_H
