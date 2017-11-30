@@ -171,7 +171,7 @@ class Database
             {
                 --bracketLevel;
             }
-            else if (wikiText.at(i) == '\'' && bracketLevel == 0)
+            else if (wikiText.mid(i,3) == "'''" && bracketLevel == 0)
             {
                 int n = 0;
                 abstract = ParseParagraph(wikiText.mid(i, wikiText.indexOf('\n', i) - i), n);
@@ -247,6 +247,14 @@ class Database
 
                 continue;
             }
+            else if (chars[3] == "<ref" && depth == 0)
+            {
+                int index = paragraph.indexOf("/>", i);
+                auto addition = paragraph.mid(i + 4, index - i - 4).toString();
+                i += addition.size() + 6;
+
+                continue;
+            }
 
             result.append(paragraph.at(i++));
         }
@@ -271,7 +279,8 @@ class Database
 
     QStringRef ParseSquareBrackets(QStringRef paragraph, int & i)
     {
-        QStringRef str = paragraph.mid(i + 2, paragraph.indexOf(']', i) - i - 2);
+        int index = paragraph.indexOf("]]", i);
+        QStringRef str = paragraph.mid(i + 2, index - i - 2);
         i += str.size() + 4;
 
         int mast =  str.indexOf('|');
@@ -279,7 +288,8 @@ class Database
         if (mast != -1)
         {
             QStringRef link = str.left(mast);
-            return str.right(mast);
+            QStringRef res = str.right(str.size() - mast - 1);
+            return res;
         }
         else
         {
