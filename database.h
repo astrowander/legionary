@@ -175,6 +175,7 @@ class Database
             {
                 int n = 0;
                 abstract = ParseParagraph(wikiText.mid(i, wikiText.indexOf('\n', i) - i), n);
+                auto compressedAbstract = qCompress((uchar*)abstract.data(), abstract.size() * sizeof(QChar), 9);
                 qDebug() << abstract;
                 break;
             }
@@ -215,9 +216,18 @@ class Database
                 result += ParceBraces(paragraph, i, depth + 1);
                 continue;
             }
-            else if (chars[1] == "[[")
+            else if ((depth < 1 && chars[1] == "[[") || chars[3] == "''[[")
             {
                 result +=ParseSquareBrackets(paragraph, i);
+                if (chars[3] == "''[[")
+                    i+=2;
+
+                continue;
+            }
+            else if (depth < 1 && chars[0] == "[")
+            {
+                int index = paragraph.indexOf(']', i);
+                i = index + 1;
                 continue;
             }
             else if (chars[3] == "&lt;")
@@ -225,34 +235,80 @@ class Database
                 result +=ParseWikiTag(paragraph, i);
                 continue;
             }
-            else if (chars[2] == "'''")
+            else if (depth < 1 &&  chars[2] == "'''")
             {
-                auto index = paragraph.indexOf('\'', i + 3);
+                i += 3;
+
+                if (depth == 0)
+                {
+                    result += ParseParagraph(paragraph, i, -1000);
+                }
+                else if (depth == -1000)
+                {
+                    result.remove(QChar(769));
+                    return result;
+                }
+                /*auto index = paragraph.indexOf('\'', i + 3);
                 auto addition = paragraph.mid(i + 3,  index - i - 3).toString();
                 i += addition.size() + 6;
 
                 addition.remove(QChar(769));
-                result += addition;
+                result += addition;*/
 
                 continue;
             }
-            else if (chars[1] == "''")
+            else if (depth < 1 && chars[1] == "''")
             {
-                auto index = paragraph.indexOf('\'', i + 2);
-                auto addition = paragraph.mid(i + 2, index - i - 2).toString();
-                i += addition.size() + 4;
+                i += 2;
 
-                addition.remove(QChar(769));
-                result += addition;
+                if (depth == 0)
+                {
+                    result += ParseParagraph(paragraph, i, -1000);
+                }
+                else if (depth == -1000)
+                {
+                    result.remove(QChar(769));
+                    return result;
+                }
 
                 continue;
             }
-            else if (chars[3] == "<ref" && depth == 0)
+            else if (chars[3] == "<ref")
             {
-                int index = paragraph.indexOf("/>", i);
-                auto addition = paragraph.mid(i + 4, index - i - 4).toString();
-                i += addition.size() + 6;
+                int indexEmpty = paragraph.indexOf("/>", i);
+                int indexClosing = paragraph.indexOf("</ref>", i);
 
+                int index = 0;
+                if (indexEmpty > 0 && indexClosing > 0)
+                {
+                    index = std::min(indexEmpty, indexClosing);
+                }
+                else if (indexEmpty > 0)
+                {
+                    index = indexEmpty;
+                }
+                else if (indexClosing > 0)
+                {
+                    index = indexClosing;
+                }
+                else
+                {
+                    i = paragraph.length();
+                    continue;
+                }
+
+                //auto addition = paragraph.mid(i + 4, index - i - 4).toString();
+                //i += addition.size();
+
+                int endIndex = paragraph.indexOf('>', index);
+                i = endIndex + 1;
+
+                continue;
+            }
+            else if (chars[3] == "<!--")
+            {
+                int index = paragraph.indexOf("-->", i);
+                i = index + 4;
                 continue;
             }
 
