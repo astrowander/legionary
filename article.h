@@ -11,7 +11,7 @@
 struct Article
 {
     QString title;
-    QList<TinyInt> links;
+    QList<Article*> links;
 };
 
 typedef QHash<TinyInt, Article>::iterator ArticleIt;

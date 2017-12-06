@@ -14,7 +14,7 @@
 class Database
 {
     QHash<TinyInt, Article> _articles;
-    QHash<QString, TinyInt> _dictionary;
+    QHash<QString, Article*> _dictionary;
 
     ArticleIt InsertNewArticle(uint32_t id)
     {
@@ -29,8 +29,9 @@ class Database
     void AddTitleToDict(ArticleIt it, const QString & title)
     {
         it->title = title;
-        if (!_dictionary.contains(title))
-            _dictionary.insert(title, it.key());
+        it->title = it->title.replace('_', ' ').toLower();
+        if (!_dictionary.contains(it->title))
+            _dictionary.insert(it->title, &it.value());
     }
 
     void AddLink(ArticleIt it, const QString & title)
@@ -159,8 +160,6 @@ class Database
         int bracketLevel = 0;
         int i = 0;
 
-        QString abstract;
-
         while (i < wikiText.length())
         {
             if (wikiText.at(i) == '{')
@@ -174,9 +173,10 @@ class Database
             else if (wikiText.mid(i,3) == "'''" && bracketLevel == 0)
             {
                 int n = 0;
-                abstract = ParseParagraph(wikiText.mid(i, wikiText.indexOf('\n', i) - i), n);
-                auto compressedAbstract = qCompress((uchar*)abstract.data(), abstract.size() * sizeof(QChar), 9);
-                qDebug() << abstract;
+                auto abstract = ParseParagraph(it, wikiText.mid(i, wikiText.indexOf('\n', i) - i), n);
+                //auto compressedAbstract = qCompress(abstract, 9);
+                //auto uncompressedAbstract = QString(qUncompress(compressedAbstract));
+                //qDebug() << abstract;
                 break;
             }
 
@@ -184,7 +184,7 @@ class Database
         }
     }
 
-    QString ParseParagraph(QStringRef paragraph, int & i, int depth = 0)
+    QString ParseParagraph(ArticleIt it, QStringRef paragraph, int & i, int depth = 0)
     {
         QString result;
 
@@ -208,17 +208,17 @@ class Database
             }
             else if (chars[0] == "(")
             {
-                result += ParseRoundBrackets(paragraph, i, depth + 1);
+                result += ParseRoundBrackets(it, paragraph, i, depth + 1);
                 continue;
             }
             else if (chars[1] == "{{")
             {
-                result += ParceBraces(paragraph, i, depth + 1);
+                result += ParceBraces(it, paragraph, i, depth + 1);
                 continue;
             }
             else if ((depth < 1 && chars[1] == "[[") || chars[3] == "''[[")
             {
-                result +=ParseSquareBrackets(paragraph, i);
+                result +=ParseSquareBrackets(it, paragraph, i);
                 if (chars[3] == "''[[")
                     i+=2;
 
@@ -227,7 +227,11 @@ class Database
             else if (depth < 1 && chars[0] == "[")
             {
                 int index = paragraph.indexOf(']', i);
-                i = index + 1;
+                if (index != -1)
+                    i = index + 1;
+                else
+                    i = paragraph.length();
+
                 continue;
             }
             else if (chars[3] == "&lt;")
@@ -241,7 +245,7 @@ class Database
 
                 if (depth == 0)
                 {
-                    result += ParseParagraph(paragraph, i, -1000);
+                    result += ParseParagraph(it, paragraph, i, -1000);
                 }
                 else if (depth == -1000)
                 {
@@ -263,7 +267,7 @@ class Database
 
                 if (depth == 0)
                 {
-                    result += ParseParagraph(paragraph, i, -1000);
+                    result += ParseParagraph(it, paragraph, i, -1000);
                 }
                 else if (depth == -1000)
                 {
@@ -308,7 +312,11 @@ class Database
             else if (chars[3] == "<!--")
             {
                 int index = paragraph.indexOf("-->", i);
-                i = index + 4;
+                if (index != -1)
+                    i = index + 4;
+                else
+                    i = paragraph.length();
+
                 continue;
             }
 
@@ -318,39 +326,57 @@ class Database
         return result;
     }
 
-    QStringRef ParseRoundBrackets(QStringRef paragraph, int & i, int depth)
+    QStringRef ParseRoundBrackets(ArticleIt it, QStringRef paragraph, int & i, int depth)
     {
         //i = paragraph.indexOf(')', i) + 1;
-        ParseParagraph(paragraph, ++i, depth);
+        ParseParagraph(it, paragraph, ++i, depth);
         return QStringRef();
     }
 
-    QStringRef ParceBraces(QStringRef paragraph, int & i, int depth)
+    QStringRef ParceBraces(ArticleIt it, QStringRef paragraph, int & i, int depth)
     {
         //i = paragraph.indexOf("}}", i) + 2;
         i += 2;
-        ParseParagraph(paragraph, i, depth);
+        ParseParagraph(it, paragraph, i, depth);
         return QStringRef();
     }
 
-    QStringRef ParseSquareBrackets(QStringRef paragraph, int & i)
+    QStringRef ParseSquareBrackets(ArticleIt it, QStringRef paragraph, int & i)
     {
         int index = paragraph.indexOf("]]", i);
+        if (index == -1)
+        {
+            i = paragraph.length();
+            return QStringRef();
+        }
+
         QStringRef str = paragraph.mid(i + 2, index - i - 2);
         i += str.size() + 4;
 
         int mast =  str.indexOf('|');
 
+        QStringRef link;
+        QStringRef res;
+
         if (mast != -1)
         {
-            QStringRef link = str.left(mast);
-            QStringRef res = str.right(str.size() - mast - 1);
-            return res;
+            link = str.left(mast);
+            res = str.right(str.size() - mast - 1);
         }
         else
         {
-            return str;
+            link = res = str;
         }
+
+        auto dictIt = _dictionary.find(link.toString().toLower());
+        if (dictIt != _dictionary.end())
+        {
+            auto val = dictIt.value();
+            it->links.append(val);
+        }
+
+        return res;
+
     }
 
     QStringRef ParseWikiTag(QStringRef paragraph, int & i)
@@ -359,7 +385,10 @@ class Database
 
         i = paragraph.indexOf("&gt;", i);
 
-        i+=4;
+        if (i==-1)
+            i = paragraph.length();
+        else
+            i+=4;
 
         return QStringRef();
     }
@@ -372,6 +401,9 @@ public:
         ProcessSqlFile("./../wikidb/ruwiki-latest-page.sql", std::bind(&Database::InsertNewArticle, this, _1), std::bind(&Database::AddTitleToDict, this, _1, _2));
        // ProcessSqlFile("./../wikidb/ruwiki-latest-pagelinks.sql", std::bind(&Database::FindArticleById, this, _1), std::bind(&Database::AddLink, this, _1, _2));
         ExtractAbstracts("./../wikidb/ruwiki-latest-pages-articles1.xml");
+        ExtractAbstracts("./../wikidb/ruwiki-latest-pages-articles2.xml");
+        ExtractAbstracts("./../wikidb/ruwiki-latest-pages-articles3.xml");
+        ExtractAbstracts("./../wikidb/ruwiki-latest-pages-articles4.xml");
     }
 };
 
