@@ -173,10 +173,11 @@ class Database
             else if (wikiText.mid(i,3) == "'''" && bracketLevel == 0)
             {
                 int n = 0;
-                auto abstract = ParseParagraph(it, wikiText.mid(i, wikiText.indexOf('\n', i) - i), n);
+
+                auto abstract = ParseParagraph(it, wikiText.mid(i, wikiText.indexOf("\n\n", i) - i), n);
                 //auto compressedAbstract = qCompress(abstract, 9);
                 //auto uncompressedAbstract = QString(qUncompress(compressedAbstract));
-                //qDebug() << abstract;
+                qDebug() << abstract;
                 break;
             }
 
@@ -319,6 +320,11 @@ class Database
 
                 continue;
             }
+            else if (chars[0] == '\n')
+            {
+                i += 1;
+                continue;
+            }
 
             result.append(paragraph.at(i++));
         }
@@ -401,9 +407,9 @@ public:
         ProcessSqlFile("./../wikidb/ruwiki-latest-page.sql", std::bind(&Database::InsertNewArticle, this, _1), std::bind(&Database::AddTitleToDict, this, _1, _2));
        // ProcessSqlFile("./../wikidb/ruwiki-latest-pagelinks.sql", std::bind(&Database::FindArticleById, this, _1), std::bind(&Database::AddLink, this, _1, _2));
         ExtractAbstracts("./../wikidb/ruwiki-latest-pages-articles1.xml");
-        ExtractAbstracts("./../wikidb/ruwiki-latest-pages-articles2.xml");
-        ExtractAbstracts("./../wikidb/ruwiki-latest-pages-articles3.xml");
-        ExtractAbstracts("./../wikidb/ruwiki-latest-pages-articles4.xml");
+       // ExtractAbstracts("./../wikidb/ruwiki-latest-pages-articles2.xml");
+       // ExtractAbstracts("./../wikidb/ruwiki-latest-pages-articles3.xml");
+       // ExtractAbstracts("./../wikidb/ruwiki-latest-pages-articles4.xml");
     }
 };
 
